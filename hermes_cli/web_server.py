@@ -75,7 +75,11 @@ except ImportError:
             f"Install with: {sys.executable} -m pip install 'fastapi' 'uvicorn[standard]'"
         )
 
-WEB_DIST = Path(os.environ["HERMES_WEB_DIST"]) if "HERMES_WEB_DIST" in os.environ else Path(__file__).parent / "web_dist"
+WEB_DIST = (
+    Path(os.environ["HERMES_WEB_DIST"])
+    if "HERMES_WEB_DIST" in os.environ and Path(os.environ["HERMES_WEB_DIST"]).exists()
+    else Path(__file__).parent / "web_dist"
+)
 _log = logging.getLogger(__name__)
 
 app = FastAPI(title="Hermes Agent", version=__version__)
@@ -84,8 +88,17 @@ app = FastAPI(title="Hermes Agent", version=__version__)
 # Session token for protecting sensitive endpoints (reveal).
 # Generated fresh on every server start — dies when the process exits.
 # Injected into the SPA HTML so only the legitimate web UI can use it.
+#
+# Hermes Desktop compatibility: when the desktop spawns the backend it
+# injects a session token via HERMES_DASHBOARD_SESSION_TOKEN so it can
+# pre-build the WS URL. Prefer the caller-supplied token so the two
+# processes stay in sync; fall back to a fresh secret only when the
+# backend is launched standalone (e.g. `hermes dashboard` from a shell).
 # ---------------------------------------------------------------------------
-_SESSION_TOKEN = secrets.token_urlsafe(32)
+_SESSION_TOKEN = (
+    os.environ.get("HERMES_DASHBOARD_SESSION_TOKEN")
+    or secrets.token_urlsafe(32)
+)
 _SESSION_HEADER_NAME = "X-Hermes-Session-Token"
 
 # In-browser Chat tab (/chat, /api/pty, …).  Off unless ``hermes dashboard --tui``
